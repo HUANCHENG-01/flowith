@@ -1,8 +1,16 @@
 // ===== ArtFlow - AI Image Generation Platform =====
 
 // API Configuration
+// 自动检测 API 地址：本地开发用 localhost:3000，部署后用当前域名
+const getApiBaseUrl = () => {
+    if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
+        return 'http://localhost:3000';
+    }
+    return window.location.origin;
+};
+
 const API_CONFIG = {
-    baseUrl: 'http://localhost:3000',
+    baseUrl: getApiBaseUrl(),
     endpoints: {
         openai: '/api/generate/openai',
         gemini: '/api/generate/gemini',

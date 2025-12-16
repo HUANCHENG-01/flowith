@@ -1,6 +1,9 @@
 // ===== ArtFlow Sticker Generator =====
 
-const API_BASE = 'http://localhost:3000';
+// 自动检测 API 地址：本地开发用 localhost:3000，部署后用当前域名
+const API_BASE = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
+    ? 'http://localhost:3000'
+    : window.location.origin;
 
 // DOM Elements
 const uploadArea = document.getElementById('uploadArea');
