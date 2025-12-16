@@ -1,0 +1,469 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ArtFlow - AI 图片生成平台</title>
+    <link rel="stylesheet" href="css/style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body>
+    <!-- 导航栏 -->
+    <nav class="navbar">
+        <div class="nav-container">
+            <div class="logo">
+                <div class="logo-icon">
+                    <i class="fas fa-palette"></i>
+                </div>
+                <span class="logo-text">ArtFlow</span>
+            </div>
+            <div class="nav-links">
+                <a href="index.html" class="nav-link">图片生成</a>
+                <a href="sticker.html" class="nav-link">表情包</a>
+                <a href="#features" class="nav-link">功能</a>
+                <a href="#gallery" class="nav-link">画廊</a>
+                <a href="#pricing" class="nav-link">定价</a>
+            </div>
+            <div class="nav-actions">
+                <button class="btn btn-ghost">登录</button>
+                <button class="btn btn-primary">免费开始</button>
+            </div>
+            <button class="mobile-menu-btn">
+                <i class="fas fa-bars"></i>
+            </button>
+        </div>
+    </nav>
+
+    <!-- 主体内容 -->
+    <main class="main-content">
+        <!-- Hero 区域 -->
+        <section class="hero">
+            <div class="hero-bg">
+                <div class="gradient-orb orb-1"></div>
+                <div class="gradient-orb orb-2"></div>
+                <div class="gradient-orb orb-3"></div>
+            </div>
+            <div class="hero-content">
+                <div class="badge">
+                    <i class="fas fa-sparkles"></i>
+                    <span>AI 驱动的创意平台</span>
+                </div>
+                <h1 class="hero-title">
+                    <span class="gradient-text">释放想象力</span>
+                    <br>创造无限可能
+                </h1>
+                <p class="hero-description">
+                    使用最先进的 AI 技术，将您的创意转化为令人惊叹的视觉艺术作品。
+                    简单输入描述，即可生成独一无二的高质量图片。
+                </p>
+                <div class="hero-actions">
+                    <button class="btn btn-primary btn-lg" onclick="scrollToGenerator()">
+                        <i class="fas fa-wand-magic-sparkles"></i>
+                        开始创作
+                    </button>
+                    <button class="btn btn-outline btn-lg">
+                        <i class="fas fa-play"></i>
+                        观看演示
+                    </button>
+                </div>
+                <div class="hero-stats">
+                    <div class="stat">
+                        <span class="stat-number">100K+</span>
+                        <span class="stat-label">创作者</span>
+                    </div>
+                    <div class="stat">
+                        <span class="stat-number">5M+</span>
+                        <span class="stat-label">图片生成</span>
+                    </div>
+                    <div class="stat">
+                        <span class="stat-number">4.9</span>
+                        <span class="stat-label">用户评分</span>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- 图片生成器 -->
+        <section class="generator-section" id="generator">
+            <div class="container">
+                <div class="section-header">
+                    <h2 class="section-title">AI 图片生成器</h2>
+                    <p class="section-subtitle">输入您的创意描述，让 AI 为您创造独特的艺术作品</p>
+                </div>
+
+                <div class="generator-card">
+                    <div class="generator-main">
+                        <!-- 输入区域 -->
+                        <div class="prompt-section">
+                            <div class="prompt-header">
+                                <i class="fas fa-lightbulb"></i>
+                                <span>描述您想要的图片</span>
+                            </div>
+                            <textarea 
+                                class="prompt-input" 
+                                id="promptInput"
+                                placeholder="例如：一只可爱的橘猫坐在窗台上，窗外是夕阳西下的城市天际线，赛博朋克风格，霓虹灯光，高清细节..."
+                                rows="4"
+                            ></textarea>
+                            <div class="prompt-tools">
+                                <div class="prompt-suggestions">
+                                    <button class="suggestion-chip" onclick="addSuggestion('赛博朋克风格')">
+                                        <i class="fas fa-city"></i> 赛博朋克
+                                    </button>
+                                    <button class="suggestion-chip" onclick="addSuggestion('水彩画风格')">
+                                        <i class="fas fa-paintbrush"></i> 水彩画
+                                    </button>
+                                    <button class="suggestion-chip" onclick="addSuggestion('油画风格')">
+                                        <i class="fas fa-brush"></i> 油画
+                                    </button>
+                                    <button class="suggestion-chip" onclick="addSuggestion('动漫风格')">
+                                        <i class="fas fa-star"></i> 动漫
+                                    </button>
+                                    <button class="suggestion-chip" onclick="addSuggestion('写实摄影风格')">
+                                        <i class="fas fa-camera"></i> 写实
+                                    </button>
+                                </div>
+                                <span class="char-count" id="charCount">0/500</span>
+                            </div>
+                        </div>
+
+                        <!-- 设置区域 -->
+                        <div class="settings-section">
+                            <div class="settings-grid">
+                                <div class="setting-item">
+                                    <label class="setting-label">
+                                        <i class="fas fa-robot"></i>
+                                        AI 模型
+                                    </label>
+                                    <select class="setting-select" id="modelSelect">
+                                        <option value="openai">OpenAI DALL-E 3</option>
+                                        <option value="gemini">Google Imagen 3</option>
+                                        <option value="gemini-flash">Gemini 2.0 Flash</option>
+                                        <option value="demo">演示模式</option>
+                                    </select>
+                                </div>
+                                <div class="setting-item">
+                                    <label class="setting-label">
+                                        <i class="fas fa-expand"></i>
+                                        尺寸
+                                    </label>
+                                    <select class="setting-select" id="sizeSelect">
+                                        <option value="1024x1024">1:1 (1024×1024)</option>
+                                        <option value="1024x768">4:3 (1024×768)</option>
+                                        <option value="768x1024">3:4 (768×1024)</option>
+                                        <option value="1280x720">16:9 (1280×720)</option>
+                                        <option value="720x1280">9:16 (720×1280)</option>
+                                    </select>
+                                </div>
+                                <div class="setting-item">
+                                    <label class="setting-label">
+                                        <i class="fas fa-wand-sparkles"></i>
+                                        风格
+                                    </label>
+                                    <select class="setting-select" id="styleSelect">
+                                        <option value="auto">自动</option>
+                                        <option value="realistic">写实</option>
+                                        <option value="anime">动漫</option>
+                                        <option value="artistic">艺术</option>
+                                        <option value="3d">3D渲染</option>
+                                    </select>
+                                </div>
+                                <div class="setting-item">
+                                    <label class="setting-label">
+                                        <i class="fas fa-sliders"></i>
+                                        质量
+                                    </label>
+                                    <select class="setting-select" id="qualitySelect">
+                                        <option value="standard">标准</option>
+                                        <option value="hd">高清</option>
+                                    </select>
+                                </div>
+                                <div class="setting-item">
+                                    <label class="setting-label">
+                                        <i class="fas fa-layer-group"></i>
+                                        数量
+                                    </label>
+                                    <select class="setting-select" id="countSelect">
+                                        <option value="1">1 张</option>
+                                        <option value="2">2 张</option>
+                                        <option value="4" selected>4 张</option>
+                                    </select>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- 生成按钮 -->
+                        <button class="generate-btn" id="generateBtn" onclick="generateImages()">
+                            <span class="btn-content">
+                                <i class="fas fa-wand-magic-sparkles"></i>
+                                生成图片
+                            </span>
+                            <span class="btn-loading">
+                                <i class="fas fa-spinner fa-spin"></i>
+                                生成中...
+                            </span>
+                        </button>
+                    </div>
+
+                    <!-- 结果区域 -->
+                    <div class="results-section" id="resultsSection">
+                        <div class="results-header">
+                            <h3>生成结果</h3>
+                            <button class="btn btn-ghost btn-sm" onclick="clearResults()">
+                                <i class="fas fa-trash"></i>
+                                清空
+                            </button>
+                        </div>
+                        <div class="results-grid" id="resultsGrid">
+                            <div class="result-placeholder">
+                                <i class="fas fa-image"></i>
+                                <p>您的创意作品将在这里显示</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- 功能特点 -->
+        <section class="features-section" id="features">
+            <div class="container">
+                <div class="section-header">
+                    <h2 class="section-title">强大功能</h2>
+                    <p class="section-subtitle">体验 AI 艺术创作的无限可能</p>
+                </div>
+                <div class="features-grid">
+                    <div class="feature-card">
+                        <div class="feature-icon">
+                            <i class="fas fa-bolt"></i>
+                        </div>
+                        <h3 class="feature-title">极速生成</h3>
+                        <p class="feature-desc">采用最新 AI 模型，几秒内生成高质量图片</p>
+                    </div>
+                    <div class="feature-card">
+                        <div class="feature-icon">
+                            <i class="fas fa-palette"></i>
+                        </div>
+                        <h3 class="feature-title">多样风格</h3>
+                        <p class="feature-desc">支持写实、动漫、油画等多种艺术风格</p>
+                    </div>
+                    <div class="feature-card">
+                        <div class="feature-icon">
+                            <i class="fas fa-expand-arrows-alt"></i>
+                        </div>
+                        <h3 class="feature-title">高清输出</h3>
+                        <p class="feature-desc">支持多种分辨率，满足不同场景需求</p>
+                    </div>
+                    <div class="feature-card">
+                        <div class="feature-icon">
+                            <i class="fas fa-history"></i>
+                        </div>
+                        <h3 class="feature-title">历史记录</h3>
+                        <p class="feature-desc">自动保存创作历史，随时回顾精彩作品</p>
+                    </div>
+                    <div class="feature-card">
+                        <div class="feature-icon">
+                            <i class="fas fa-download"></i>
+                        </div>
+                        <h3 class="feature-title">便捷下载</h3>
+                        <p class="feature-desc">一键下载生成图片，支持多种格式</p>
+                    </div>
+                    <div class="feature-card">
+                        <div class="feature-icon">
+                            <i class="fas fa-share-nodes"></i>
+                        </div>
+                        <h3 class="feature-title">社区分享</h3>
+                        <p class="feature-desc">分享作品到社区，与创作者交流灵感</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- 画廊展示 -->
+        <section class="gallery-section" id="gallery">
+            <div class="container">
+                <div class="section-header">
+                    <h2 class="section-title">创意画廊</h2>
+                    <p class="section-subtitle">探索社区用户的精彩创作</p>
+                </div>
+                <div class="gallery-filter">
+                    <button class="filter-btn active" data-filter="all">全部</button>
+                    <button class="filter-btn" data-filter="realistic">写实</button>
+                    <button class="filter-btn" data-filter="anime">动漫</button>
+                    <button class="filter-btn" data-filter="fantasy">奇幻</button>
+                    <button class="filter-btn" data-filter="landscape">风景</button>
+                </div>
+                <div class="gallery-grid" id="galleryGrid">
+                    <!-- 画廊图片将通过 JS 动态加成 -->
+                </div>
+                <div class="gallery-actions">
+                    <button class="btn btn-outline btn-lg">
+                        <i class="fas fa-th-large"></i>
+                        浏览更多作品
+                    </button>
+                </div>
+            </div>
+        </section>
+
+        <!-- 定价方案 -->
+        <section class="pricing-section" id="pricing">
+            <div class="container">
+                <div class="section-header">
+                    <h2 class="section-title">选择方案</h2>
+                    <p class="section-subtitle">灵活的定价，满足不同创作需求</p>
+                </div>
+                <div class="pricing-grid">
+                    <div class="pricing-card">
+                        <div class="pricing-header">
+                            <h3 class="pricing-name">免费版</h3>
+                            <div class="pricing-price">
+                                <span class="currency">¥</span>
+                                <span class="amount">0</span>
+                                <span class="period">/月</span>
+                            </div>
+                        </div>
+                        <ul class="pricing-features">
+                            <li><i class="fas fa-check"></i> 每日 10 次生成</li>
+                            <li><i class="fas fa-check"></i> 标准质量输出</li>
+                            <li><i class="fas fa-check"></i> 基础风格选择</li>
+                            <li><i class="fas fa-check"></i> 社区画廊访问</li>
+                            <li class="disabled"><i class="fas fa-times"></i> 高清输出</li>
+                            <li class="disabled"><i class="fas fa-times"></i> 商业使用许可</li>
+                        </ul>
+                        <button class="btn btn-outline btn-block">开始使用</button>
+                    </div>
+                    <div class="pricing-card featured">
+                        <div class="pricing-badge">最受欢迎</div>
+                        <div class="pricing-header">
+                            <h3 class="pricing-name">专业版</h3>
+                            <div class="pricing-price">
+                                <span class="currency">¥</span>
+                                <span class="amount">49</span>
+                                <span class="period">/月</span>
+                            </div>
+                        </div>
+                        <ul class="pricing-features">
+                            <li><i class="fas fa-check"></i> 无限次生成</li>
+                            <li><i class="fas fa-check"></i> 高清质量输出</li>
+                            <li><i class="fas fa-check"></i> 全部风格解锁</li>
+                            <li><i class="fas fa-check"></i> 优先生成队列</li>
+                            <li><i class="fas fa-check"></i> 历史记录无限</li>
+                            <li><i class="fas fa-check"></i> 商业使用许可</li>
+                        </ul>
+                        <button class="btn btn-primary btn-block">立即订阅</button>
+                    </div>
+                    <div class="pricing-card">
+                        <div class="pricing-header">
+                            <h3 class="pricing-name">企业版</h3>
+                            <div class="pricing-price">
+                                <span class="currency">¥</span>
+                                <span class="amount">199</span>
+                                <span class="period">/月</span>
+                            </div>
+                        </div>
+                        <ul class="pricing-features">
+                            <li><i class="fas fa-check"></i> 包含专业版全部功能</li>
+                            <li><i class="fas fa-check"></i> API 接口访问</li>
+                            <li><i class="fas fa-check"></i> 团队协作功能</li>
+                            <li><i class="fas fa-check"></i> 专属客户支持</li>
+                            <li><i class="fas fa-check"></i> 自定义模型训练</li>
+                            <li><i class="fas fa-check"></i> SLA 服务保障</li>
+                        </ul>
+                        <button class="btn btn-outline btn-block">联系销售</button>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- CTA 区域 -->
+        <section class="cta-section">
+            <div class="container">
+                <div class="cta-content">
+                    <h2 class="cta-title">准备好开始创作了吗？</h2>
+                    <p class="cta-description">加入数万创作者，开启 AI 艺术创作之旅</p>
+                    <button class="btn btn-primary btn-lg">
+                        <i class="fas fa-rocket"></i>
+                        免费开始使用
+                    </button>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <!-- 页脚 -->
+    <footer class="footer">
+        <div class="container">
+            <div class="footer-grid">
+                <div class="footer-brand">
+                    <div class="logo">
+                        <div class="logo-icon">
+                            <i class="fas fa-palette"></i>
+                        </div>
+                        <span class="logo-text">ArtFlow</span>
+                    </div>
+                    <p class="footer-desc">AI 驱动的创意平台，让每个人都能成为艺术家</p>
+                    <div class="social-links">
+                        <a href="#" class="social-link"><i class="fab fa-twitter"></i></a>
+                        <a href="#" class="social-link"><i class="fab fa-discord"></i></a>
+                        <a href="#" class="social-link"><i class="fab fa-github"></i></a>
+                        <a href="#" class="social-link"><i class="fab fa-instagram"></i></a>
+                    </div>
+                </div>
+                <div class="footer-links">
+                    <h4>产品</h4>
+                    <ul>
+                        <li><a href="#">功能介绍</a></li>
+                        <li><a href="#">定价方案</a></li>
+                        <li><a href="#">API 文档</a></li>
+                        <li><a href="#">更新日志</a></li>
+                    </ul>
+                </div>
+                <div class="footer-links">
+                    <h4>资源</h4>
+                    <ul>
+                        <li><a href="#">帮助中心</a></li>
+                        <li><a href="#">教程指南</a></li>
+                        <li><a href="#">社区论坛</a></li>
+                        <li><a href="#">博客</a></li>
+                    </ul>
+                </div>
+                <div class="footer-links">
+                    <h4>公司</h4>
+                    <ul>
+                        <li><a href="#">关于我们</a></li>
+                        <li><a href="#">联系我们</a></li>
+                        <li><a href="#">隐私政策</a></li>
+                        <li><a href="#">服务条款</a></li>
+                    </ul>
+                </div>
+            </div>
+            <div class="footer-bottom">
+                <p>&copy; 2025 ArtFlow. All rights reserved.</p>
+            </div>
+        </div>
+    </footer>
+
+    <!-- 图片预览模态框 -->
+    <div class="modal" id="imageModal">
+        <div class="modal-content">
+            <button class="modal-close" onclick="closeModal()">
+                <i class="fas fa-times"></i>
+            </button>
+            <img src="" alt="Preview" id="modalImage">
+            <div class="modal-actions">
+                <button class="btn btn-primary" onclick="downloadImage()">
+                    <i class="fas fa-download"></i>
+                    下载图片
+                </button>
+                <button class="btn btn-outline" onclick="regenerateImage()">
+                    <i class="fas fa-redo"></i>
+                    重新生成
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script src="js/app.js"></script>
+</body>
+</html>

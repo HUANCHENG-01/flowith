@@ -1,0 +1,240 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI 表情包生成器 - ArtFlow</title>
+    <link rel="stylesheet" href="css/style.css">
+    <link rel="stylesheet" href="css/sticker.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body>
+    <!-- 导航栏 -->
+    <nav class="navbar">
+        <div class="nav-container">
+            <a href="index.html" class="logo">
+                <div class="logo-icon">
+                    <i class="fas fa-palette"></i>
+                </div>
+                <span class="logo-text">ArtFlow</span>
+            </a>
+            <div class="nav-links">
+                <a href="index.html" class="nav-link">图片生成</a>
+                <a href="sticker.html" class="nav-link active">表情包</a>
+            </div>
+            <div class="nav-actions">
+                <button class="btn btn-ghost">登录</button>
+                <button class="btn btn-primary">免费开始</button>
+            </div>
+        </div>
+    </nav>
+
+    <!-- 主体内容 -->
+    <main class="main-content">
+        <!-- Hero 区域 -->
+        <section class="sticker-hero">
+            <div class="hero-bg">
+                <div class="gradient-orb orb-1"></div>
+                <div class="gradient-orb orb-2"></div>
+            </div>
+            <div class="hero-content">
+                <div class="badge">
+                    <i class="fas fa-face-laugh-squint"></i>
+                    <span>AI 表情包生成器</span>
+                </div>
+                <h1 class="hero-title">
+                    <span class="gradient-text">一键生成</span> Q版表情包
+                </h1>
+                <p class="hero-description">
+                    上传角色图片或输入描述，AI 自动生成一套可爱的 LINE 风格表情包
+                </p>
+            </div>
+        </section>
+
+        <!-- 表情包生成器 -->
+        <section class="sticker-generator">
+            <div class="container">
+                <div class="generator-card">
+                    <!-- 左侧：输入区域 -->
+                    <div class="sticker-input-section">
+                        <!-- 图片上传 -->
+                        <div class="upload-section">
+                            <h3><i class="fas fa-image"></i> 参考图片（可选）</h3>
+                            <div class="upload-area" id="uploadArea">
+                                <input type="file" id="imageInput" accept="image/*" hidden>
+                                <div class="upload-placeholder" id="uploadPlaceholder">
+                                    <i class="fas fa-cloud-upload-alt"></i>
+                                    <p>点击或拖拽上传角色图片</p>
+                                    <span>支持 JPG, PNG, WebP</span>
+                                </div>
+                                <div class="upload-preview" id="uploadPreview" style="display: none;">
+                                    <img id="previewImage" src="" alt="Preview">
+                                    <button class="remove-btn" onclick="removeImage()">
+                                        <i class="fas fa-times"></i>
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- 角色描述 -->
+                        <div class="description-section">
+                            <h3><i class="fas fa-pen"></i> 角色描述</h3>
+                            <textarea 
+                                id="characterDescription" 
+                                placeholder="描述您想要的角色，例如：蓝色长发的可爱女孩，穿着白色连衣裙，戴着蝴蝶结发饰..."
+                                rows="3"
+                            ></textarea>
+                        </div>
+
+                        <!-- 表情选择 -->
+                        <div class="expressions-section">
+                            <div class="expressions-header">
+                                <h3><i class="fas fa-face-smile"></i> 选择表情</h3>
+                                <button class="btn btn-ghost btn-sm" onclick="generateRandomExpressions()">
+                                    <i class="fas fa-dice"></i> AI随机生成
+                                </button>
+                            </div>
+                            <div class="expressions-grid" id="expressionsGrid">
+                                <!-- 表情将通过JS动态生成 -->
+                            </div>
+                            <div class="expression-actions">
+                                <button class="btn btn-ghost btn-sm" onclick="selectAllExpressions()">
+                                    <i class="fas fa-check-double"></i> 全选
+                                </button>
+                                <button class="btn btn-ghost btn-sm" onclick="clearAllExpressions()">
+                                    <i class="fas fa-times"></i> 清空
+                                </button>
+                            </div>
+                            <div class="custom-expression">
+                                <input type="text" id="customExpression" placeholder="添加自定义表情文字...">
+                                <button class="btn btn-ghost btn-sm" onclick="addCustomExpression()">
+                                    <i class="fas fa-plus"></i>
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- 生成设置 -->
+                        <div class="settings-row">
+                            <div class="setting-item">
+                                <label>布局</label>
+                                <select id="layoutSelect">
+                                    <option value="2x4">2×4 (8张)</option>
+                                    <option value="3x4">3×4 (12张)</option>
+                                    <option value="4x4">4×4 (16张)</option>
+                                    <option value="4x6" selected>4×6 (24张)</option>
+                                </select>
+                            </div>
+                            <div class="setting-item">
+                                <label>风格</label>
+                                <select id="styleSelect">
+                                    <option value="Q版LINE风格" selected>Q版 LINE 风格</option>
+                                    <option value="可爱chibi风格">Chibi 萌系</option>
+                                    <option value="简约emoji风格">简约 Emoji</option>
+                                    <option value="手绘水彩风格">手绘水彩</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <!-- 生成按钮 -->
+                        <button class="generate-btn" id="generateBtn" onclick="generateStickers()">
+                            <span class="btn-content">
+                                <i class="fas fa-wand-magic-sparkles"></i>
+                                生成表情包
+                            </span>
+                            <span class="btn-loading">
+                                <i class="fas fa-spinner fa-spin"></i>
+                                <span id="progressText">生成中...</span>
+                            </span>
+                        </button>
+                    </div>
+
+                    <!-- 右侧：结果预览 -->
+                    <div class="sticker-results-section">
+                        <div class="results-header">
+                            <h3><i class="fas fa-th"></i> 表情包预览</h3>
+                            <div class="results-actions">
+                                <button class="btn btn-ghost btn-sm" onclick="downloadAll()" id="downloadAllBtn" disabled>
+                                    <i class="fas fa-download"></i> 下载全部
+                                </button>
+                            </div>
+                        </div>
+                        <div class="sticker-grid" id="stickerGrid">
+                            <div class="sticker-placeholder">
+                                <i class="fas fa-face-smile-wink"></i>
+                                <p>生成的表情包将在这里显示</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- 示例展示 -->
+        <section class="examples-section">
+            <div class="container">
+                <h2 class="section-title">表情包示例</h2>
+                <p class="section-subtitle">看看其他用户创作的可爱表情包</p>
+                <div class="examples-grid">
+                    <div class="example-card">
+                        <div class="example-stickers">
+                            <img src="https://picsum.photos/seed/sticker1/150/150" alt="示例表情1">
+                            <img src="https://picsum.photos/seed/sticker2/150/150" alt="示例表情2">
+                            <img src="https://picsum.photos/seed/sticker3/150/150" alt="示例表情3">
+                            <img src="https://picsum.photos/seed/sticker4/150/150" alt="示例表情4">
+                        </div>
+                        <p class="example-desc">蓝发少女表情包</p>
+                    </div>
+                    <div class="example-card">
+                        <div class="example-stickers">
+                            <img src="https://picsum.photos/seed/sticker5/150/150" alt="示例表情1">
+                            <img src="https://picsum.photos/seed/sticker6/150/150" alt="示例表情2">
+                            <img src="https://picsum.photos/seed/sticker7/150/150" alt="示例表情3">
+                            <img src="https://picsum.photos/seed/sticker8/150/150" alt="示例表情4">
+                        </div>
+                        <p class="example-desc">可爱猫咪表情包</p>
+                    </div>
+                    <div class="example-card">
+                        <div class="example-stickers">
+                            <img src="https://picsum.photos/seed/sticker9/150/150" alt="示例表情1">
+                            <img src="https://picsum.photos/seed/sticker10/150/150" alt="示例表情2">
+                            <img src="https://picsum.photos/seed/sticker11/150/150" alt="示例表情3">
+                            <img src="https://picsum.photos/seed/sticker12/150/150" alt="示例表情4">
+                        </div>
+                        <p class="example-desc">动漫男生表情包</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <!-- 页脚 -->
+    <footer class="footer">
+        <div class="container">
+            <div class="footer-bottom">
+                <p>&copy; 2025 ArtFlow. All rights reserved.</p>
+            </div>
+        </div>
+    </footer>
+
+    <!-- 图片预览模态框 -->
+    <div class="modal" id="stickerModal">
+        <div class="modal-content sticker-modal-content">
+            <button class="modal-close" onclick="closeStickerModal()">
+                <i class="fas fa-times"></i>
+            </button>
+            <img src="" alt="Sticker Preview" id="modalStickerImage">
+            <div class="modal-info">
+                <span class="modal-expression" id="modalExpression"></span>
+            </div>
+            <div class="modal-actions">
+                <button class="btn btn-primary" onclick="downloadCurrentSticker()">
+                    <i class="fas fa-download"></i> 下载
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script src="js/sticker.js"></script>
+</body>
+</html>
