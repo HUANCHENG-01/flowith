@@ -9,12 +9,309 @@ const PORT = process.env.PORT || 3000;
 
 // Middleware
 app.use(cors());
-app.use(express.json());
+app.use(express.json({ limit: '50mb' }));
 app.use(express.static(path.join(__dirname, '..')));
 
 // API Keys from environment variables
 const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
+
+// WhatAI API 配置
+const WHATAI_API_URL = process.env.WHATAI_API_URL || 'https://api.whatai.cc';
+const WHATAI_API_KEY = process.env.WHATAI_API_KEY;
+const WHATAI_MODEL = process.env.WHATAI_MODEL || 'gemini-3-pro-image-preview';
+
+// ===== WhatAI 图片生成代理 =====
+app.post('/api/generate/image', async (req, res) => {
+    try {
+        const { prompt, count = 1 } = req.body;
+
+        if (!WHATAI_API_KEY) {
+            return res.status(500).json({ 
+                error: '未配置 WhatAI API 密钥',
+                message: '请在 server/.env 文件中设置 WHATAI_API_KEY'
+            });
+        }
+
+        if (!prompt) {
+            return res.status(400).json({ error: '请提供图片描述' });
+        }
+
+        console.log(`[WhatAI] 生成图片: "${prompt.substring(0, 50)}..."`);
+
+        const images = [];
+        
+        for (let i = 0; i < count; i++) {
+            const response = await fetch(`${WHATAI_API_URL}/v1/chat/completions`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${WHATAI_API_KEY}`
+                },
+                body: JSON.stringify({
+                    model: WHATAI_MODEL,
+                    messages: [
+                        {
+                            role: 'user',
+                            content: `Generate an image: ${prompt}`
+                        }
+                    ]
+                })
+            });
+
+            const data = await response.json();
+
+            if (!response.ok) {
+                console.error('[WhatAI] API 错误:', data.error);
+                throw new Error(data.error?.message || '生成失败');
+            }
+
+            // 解析返回的图片
+            const imageUrl = extractImageFromResponse(data);
+            if (imageUrl) {
+                images.push({
+                    url: imageUrl,
+                    prompt: prompt,
+                    model: WHATAI_MODEL
+                });
+            }
+        }
+
+        console.log(`[WhatAI] 生成成功: ${images.length} 张图片`);
+        res.json({
+            success: true,
+            images: images,
+            model: WHATAI_MODEL
+        });
+
+    } catch (error) {
+        console.error('[WhatAI] 服务器错误:', error);
+        res.status(500).json({ 
+            error: '生成失败',
+            message: error.message 
+        });
+    }
+});
+
+// ===== WhatAI 表情包生成代理 =====
+app.post('/api/generate/sticker', async (req, res) => {
+    try {
+        const { description, expressions, style = 'line', referenceImage } = req.body;
+
+        if (!WHATAI_API_KEY) {
+            return res.status(500).json({ 
+                error: '未配置 WhatAI API 密钥'
+            });
+        }
+
+        if (!description && !referenceImage) {
+            return res.status(400).json({ error: '请提供角色描述或参考图片' });
+        }
+
+        if (!expressions || expressions.length === 0) {
+            return res.status(400).json({ error: '请选择至少一个表情' });
+        }
+
+        console.log(`[WhatAI] 生成表情包: ${expressions.length} 个`);
+
+        const stickers = [];
+        const styleMap = {
+            'line': 'LINE sticker style, simple cute',
+            'chibi': 'chibi anime style',
+            'emoji': 'simple emoji style',
+            'watercolor': 'watercolor hand-drawn style'
+        };
+
+        for (let i = 0; i < expressions.length; i++) {
+            const expr = expressions[i];
+            console.log(`[WhatAI] 生成表情 ${i + 1}/${expressions.length}: "${expr}"`);
+
+            try {
+                let prompt = `Generate a cute chibi sticker image with text "${expr}" displayed prominently. `;
+                prompt += `Style: ${styleMap[style] || styleMap.line}. `;
+                prompt += `White or transparent background. `;
+                
+                if (description) {
+                    prompt += `Character description: ${description}. `;
+                }
+                
+                prompt += `The expression/emotion should match the text "${expr}". High quality, cute, expressive.`;
+
+                const requestBody = {
+                    model: WHATAI_MODEL,
+                    messages: [
+                        {
+                            role: 'user',
+                            content: referenceImage ? [
+                                { type: 'text', text: prompt },
+                                { type: 'image_url', image_url: { url: referenceImage } }
+                            ] : prompt
+                        }
+                    ]
+                };
+
+                const response = await fetch(`${WHATAI_API_URL}/v1/chat/completions`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${WHATAI_API_KEY}`
+                    },
+                    body: JSON.stringify(requestBody)
+                });
+
+                const data = await response.json();
+
+                if (!response.ok) {
+                    throw new Error(data.error?.message || '生成失败');
+                }
+
+                const imageUrl = extractImageFromResponse(data);
+                stickers.push({
+                    expression: expr,
+                    url: imageUrl,
+                    success: !!imageUrl
+                });
+
+            } catch (err) {
+                console.error(`[WhatAI] 生成 "${expr}" 失败:`, err.message);
+                stickers.push({
+                    expression: expr,
+                    url: null,
+                    success: false,
+                    error: err.message
+                });
+            }
+        }
+
+        const successCount = stickers.filter(s => s.success).length;
+        console.log(`[WhatAI] 表情包生成完成: ${successCount}/${stickers.length}`);
+
+        res.json({
+            success: true,
+            stickers: stickers,
+            model: WHATAI_MODEL
+        });
+
+    } catch (error) {
+        console.error('[WhatAI] 服务器错误:', error);
+        res.status(500).json({ 
+            error: '生成失败',
+            message: error.message 
+        });
+    }
+});
+
+// ===== WhatAI 生成随机表情文字 =====
+app.post('/api/generate/expressions', async (req, res) => {
+    try {
+        const { count = 16 } = req.body;
+
+        if (!WHATAI_API_KEY) {
+            return res.status(500).json({ error: '未配置 API 密钥' });
+        }
+
+        const response = await fetch(`${WHATAI_API_URL}/v1/chat/completions`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${WHATAI_API_KEY}`
+            },
+            body: JSON.stringify({
+                model: 'gpt-4o-mini',
+                messages: [
+                    {
+                        role: 'user',
+                        content: `生成${count}个适合表情包的中文短语，包括日常问候、网络meme、情绪表达等。每行一个，只输出短语，不要编号和其他内容。`
+                    }
+                ],
+                max_tokens: 300
+            })
+        });
+
+        const data = await response.json();
+
+        if (!response.ok) {
+            throw new Error(data.error?.message || '生成失败');
+        }
+
+        const content = data.choices?.[0]?.message?.content || '';
+        const expressions = content
+            .split('\n')
+            .map(e => e.trim())
+            .filter(e => e && e.length <= 10);
+
+        res.json({
+            success: true,
+            expressions: expressions.slice(0, count)
+        });
+
+    } catch (error) {
+        console.error('[WhatAI] 生成表情文字失败:', error);
+        res.status(500).json({ 
+            error: '生成失败',
+            message: error.message 
+        });
+    }
+});
+
+// ===== 从 API 响应中提取图片 =====
+function extractImageFromResponse(data) {
+    if (!data.choices?.[0]?.message) return null;
+    
+    const message = data.choices[0].message;
+    const content = message.content;
+
+    // 检查 parts 格式 (Gemini 风格)
+    if (message.parts) {
+        for (const part of message.parts) {
+            if (part.inline_data?.data) {
+                const mimeType = part.inline_data.mime_type || 'image/png';
+                return `data:${mimeType};base64,${part.inline_data.data}`;
+            }
+        }
+    }
+
+    // 检查数组格式（多模态返回）
+    if (Array.isArray(content)) {
+        for (const part of content) {
+            if (part.type === 'image_url') {
+                return part.image_url?.url;
+            }
+            if (part.type === 'image' && part.source?.data) {
+                const mimeType = part.source.media_type || 'image/png';
+                return `data:${mimeType};base64,${part.source.data}`;
+            }
+        }
+    }
+
+    // 检查字符串内容
+    if (typeof content === 'string') {
+        // Base64 图片
+        if (content.includes('data:image')) {
+            const match = content.match(/data:image[^"'\s]+/);
+            if (match) return match[0];
+        }
+        // Markdown 图片链接
+        const imgMatch = content.match(/!\[.*?\]\((.*?)\)/);
+        if (imgMatch) return imgMatch[1];
+        // 纯 URL
+        const urlMatch = content.match(/https?:\/\/[^\s"']+\.(png|jpg|jpeg|gif|webp)/i);
+        if (urlMatch) return urlMatch[0];
+    }
+
+    return null;
+}
+
+// ===== API 状态检查 =====
+app.get('/api/health', (req, res) => {
+    res.json({
+        status: 'ok',
+        whatai: !!WHATAI_API_KEY,
+        openai: !!OPENAI_API_KEY,
+        gemini: !!GEMINI_API_KEY,
+        model: WHATAI_MODEL
+    });
+});
 
 // ===== OpenAI DALL-E Image Generation =====
 app.post('/api/generate/openai', async (req, res) => {

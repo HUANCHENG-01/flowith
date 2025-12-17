@@ -1,10 +1,10 @@
 // ===== ArtFlow - AI Image Generation Platform =====
 
-// API Configuration - 使用 whatai.cc API
+// API Configuration - 通过后端代理调用
 const API_CONFIG = {
-    baseUrl: 'https://api.whatai.cc',
-    apiKey: 'sk-sd8MpVSVDdQtQZj77AlhDayAOlQc5u3VmYQIXV2aKilNZhcx',
-    model: 'gemini-3-pro-image-preview'
+    baseUrl: window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
+        ? 'http://localhost:3000'
+        : window.location.origin
 };
 
 // Current selected model - 使用 gemini-3-pro-image-preview
@@ -21,87 +21,39 @@ const imageModal = document.getElementById('imageModal');
 const modalImage = document.getElementById('modalImage');
 const modelSelect = document.getElementById('modelSelect');
 
-// ===== 直接调用 whatai.cc API 生成图片 =====
+// ===== 通过后端代理生成图片 =====
 async function generateWithWhatAI(prompt, count = 1) {
-    const images = [];
+    const response = await fetch(`${API_CONFIG.baseUrl}/api/generate/image`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+            prompt: prompt,
+            count: count
+        })
+    });
     
-    for (let i = 0; i < count; i++) {
-        showNotification(`正在生成第 ${i + 1}/${count} 张图片...`, 'info');
-        
-        const response = await fetch(`${API_CONFIG.baseUrl}/v1/chat/completions`, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${API_CONFIG.apiKey}`
-            },
-            body: JSON.stringify({
-                model: API_CONFIG.model,
-                messages: [
-                    {
-                        role: 'user',
-                        content: `Generate an image: ${prompt}`
-                    }
-                ]
-            })
-        });
-        
-        const data = await response.json();
-        
-        if (!response.ok) {
-            throw new Error(data.error?.message || '生成失败');
-        }
-        
-        // 解析返回的图片
-        if (data.choices && data.choices[0]?.message?.content) {
-            const content = data.choices[0].message.content;
-            // 检查是否有图片数据 (base64 或 URL)
-            if (typeof content === 'string' && content.includes('data:image')) {
-                images.push({
-                    url: content,
-                    prompt: prompt,
-                    model: API_CONFIG.model,
-                    timestamp: new Date().toISOString()
-                });
-            } else if (data.choices[0].message.image_url) {
-                images.push({
-                    url: data.choices[0].message.image_url,
-                    prompt: prompt,
-                    model: API_CONFIG.model,
-                    timestamp: new Date().toISOString()
-                });
-            } else {
-                // 尝试从内容中提取图片
-                const imgMatch = content.match(/!\[.*?\]\((.*?)\)/);
-                if (imgMatch) {
-                    images.push({
-                        url: imgMatch[1],
-                        prompt: prompt,
-                        model: API_CONFIG.model,
-                        timestamp: new Date().toISOString()
-                    });
-                }
-            }
-        }
-        
-        // 检查是否有 inline_data 格式
-        if (data.choices?.[0]?.message?.parts) {
-            for (const part of data.choices[0].message.parts) {
-                if (part.inline_data?.data) {
-                    const mimeType = part.inline_data.mime_type || 'image/png';
-                    images.push({
-                        url: `data:${mimeType};base64,${part.inline_data.data}`,
-                        prompt: prompt,
-                        model: API_CONFIG.model,
-                        timestamp: new Date().toISOString()
-                    });
-                }
-            }
-        }
+    const data = await response.json();
+    
+    if (!response.ok) {
+        throw new Error(data.error || data.message || '生成失败');
     }
     
-    generatedImages = [...images, ...generatedImages];
-    displayGeneratedImages();
-    return images;
+    if (data.images && data.images.length > 0) {
+        const images = data.images.map(img => ({
+            url: img.url,
+            prompt: img.prompt || prompt,
+            model: img.model || 'whatai',
+            timestamp: new Date().toISOString()
+        }));
+        
+        generatedImages = [...images, ...generatedImages];
+        displayGeneratedImages();
+        return images;
+    }
+    
+    return [];
 }
 
 // Sample Images (using placeholder images for demo)
@@ -227,9 +179,20 @@ function getModelDisplayName(model) {
 
 // ===== Check API Status =====
 async function checkApiStatus() {
-    // whatai.cc API 已配置，直接可用
-    console.log('使用 whatai.cc API，模型:', API_CONFIG.model);
-    showNotification('API 已就绪，可以开始生成图片', 'success');
+    try {
+        const response = await fetch(`${API_CONFIG.baseUrl}/api/health`);
+        const data = await response.json();
+        console.log('API 状态:', data);
+        
+        if (data.whatai) {
+            showNotification('API 已就绪，可以开始生成图片', 'success');
+        } else {
+            showNotification('API 未配置，请检查服务器设置', 'warning');
+        }
+    } catch (error) {
+        console.warn('API 服务器未运行');
+        showNotification('无法连接到服务器', 'error');
+    }
 }
 
 // ===== Scroll to Generator =====

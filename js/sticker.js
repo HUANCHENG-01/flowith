@@ -1,10 +1,10 @@
 // ===== ArtFlow Sticker Generator =====
 
-// API Configuration - 使用 whatai.cc API
+// API Configuration - 通过后端代理调用
 const API_CONFIG = {
-    baseUrl: 'https://api.whatai.cc',
-    apiKey: 'sk-sd8MpVSVDdQtQZj77AlhDayAOlQc5u3VmYQIXV2aKilNZhcx',
-    model: 'gemini-3-pro-image-preview'
+    baseUrl: window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
+        ? 'http://localhost:3000'
+        : window.location.origin
 };
 
 // DOM Elements
@@ -76,40 +76,23 @@ async function generateRandomExpressions() {
     btn.disabled = true;
     
     try {
-        // 使用 whatai.cc API 生成随机表情文字
-        const response = await fetch(`${API_CONFIG.baseUrl}/v1/chat/completions`, {
+        // 通过后端代理调用 API
+        const response = await fetch(`${API_CONFIG.baseUrl}/api/generate/expressions`, {
             method: 'POST',
             headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${API_CONFIG.apiKey}`
+                'Content-Type': 'application/json'
             },
-            body: JSON.stringify({
-                model: 'gpt-4o-mini',
-                messages: [
-                    {
-                        role: 'user',
-                        content: '生成16个适合表情包的中文短语，包括日常问候、网络meme、情绪表达等。每行一个，只输出短语，不要编号和其他内容。'
-                    }
-                ],
-                max_tokens: 200
-            })
+            body: JSON.stringify({ count: 16 })
         });
         
         const data = await response.json();
         
-        if (data.choices?.[0]?.message?.content) {
-            const expressions = data.choices[0].message.content
-                .split('\n')
-                .map(e => e.trim())
-                .filter(e => e && e.length <= 10);
-            
-            if (expressions.length > 0) {
-                renderExpressions(expressions.slice(0, 16), 8);
-                showNotification(`已生成 ${expressions.length} 个表情文字！`, 'success');
-                return;
-            }
+        if (data.success && data.expressions?.length > 0) {
+            renderExpressions(data.expressions, 8);
+            showNotification(`已生成 ${data.expressions.length} 个表情文字！`, 'success');
+        } else {
+            throw new Error(data.error || '生成失败');
         }
-        throw new Error('生成失败');
     } catch (error) {
         console.error('生成表情文字失败:', error);
         showNotification('生成失败，使用默认表情', 'warning');
@@ -249,118 +232,34 @@ async function generateStickers() {
     showSkeletonLoaders(expressions);
     
     try {
-        // 直接调用 whatai.cc API 生成表情包
-        const stickers = [];
+        // 通过后端代理调用 API 生成表情包
+        progressText.textContent = `生成中...`;
         
-        for (let i = 0; i < expressions.length; i++) {
-            const expr = expressions[i];
-            progressText.textContent = `生成中 ${i + 1}/${expressions.length}...`;
-            
-            try {
-                // 构建提示词
-                let prompt = `Generate a cute chibi sticker image with text "${expr}" displayed prominently. `;
-                prompt += `Style: ${style === 'line' ? 'LINE sticker style, simple cute' : style === 'chibi' ? 'chibi anime style' : style === 'emoji' ? 'simple emoji style' : 'watercolor hand-drawn style'}. `;
-                prompt += `White or transparent background. `;
-                
-                if (description) {
-                    prompt += `Character description: ${description}. `;
-                }
-                
-                if (referenceImageBase64) {
-                    prompt += `The character should match the reference image style. `;
-                }
-                
-                prompt += `The expression/emotion should match the text "${expr}". High quality, cute, expressive.`;
-                
-                const requestBody = {
-                    model: API_CONFIG.model,
-                    messages: [
-                        {
-                            role: 'user',
-                            content: referenceImageBase64 ? [
-                                { type: 'text', text: prompt },
-                                { type: 'image_url', image_url: { url: referenceImageBase64 } }
-                            ] : prompt
-                        }
-                    ]
-                };
-                
-                const response = await fetch(`${API_CONFIG.baseUrl}/v1/chat/completions`, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'Authorization': `Bearer ${API_CONFIG.apiKey}`
-                    },
-                    body: JSON.stringify(requestBody)
-                });
-                
-                const data = await response.json();
-                
-                if (!response.ok) {
-                    throw new Error(data.error?.message || '生成失败');
-                }
-                
-                // 解析返回的图片
-                let imageUrl = null;
-                
-                if (data.choices?.[0]?.message?.content) {
-                    const content = data.choices[0].message.content;
-                    
-                    // 检查是否是数组格式（多模态返回）
-                    if (Array.isArray(content)) {
-                        for (const part of content) {
-                            if (part.type === 'image_url') {
-                                imageUrl = part.image_url?.url;
-                                break;
-                            }
-                        }
-                    }
-                    // 检查字符串中是否包含 base64 图片
-                    else if (typeof content === 'string') {
-                        if (content.includes('data:image')) {
-                            const match = content.match(/data:image[^"'\s]+/);
-                            if (match) imageUrl = match[0];
-                        } else {
-                            const imgMatch = content.match(/!\[.*?\]\((.*?)\)/);
-                            if (imgMatch) imageUrl = imgMatch[1];
-                        }
-                    }
-                }
-                
-                // 检查 parts 格式
-                if (!imageUrl && data.choices?.[0]?.message?.parts) {
-                    for (const part of data.choices[0].message.parts) {
-                        if (part.inline_data?.data) {
-                            const mimeType = part.inline_data.mime_type || 'image/png';
-                            imageUrl = `data:${mimeType};base64,${part.inline_data.data}`;
-                            break;
-                        }
-                    }
-                }
-                
-                stickers.push({
-                    expression: expr,
-                    url: imageUrl,
-                    success: !!imageUrl
-                });
-                
-            } catch (err) {
-                console.error(`生成 "${expr}" 失败:`, err);
-                stickers.push({
-                    expression: expr,
-                    url: null,
-                    success: false,
-                    error: err.message
-                });
-            }
+        const response = await fetch(`${API_CONFIG.baseUrl}/api/generate/sticker`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                description: description,
+                expressions: expressions,
+                style: style,
+                referenceImage: referenceImageBase64
+            })
+        });
+        
+        const data = await response.json();
+        
+        if (!response.ok) {
+            throw new Error(data.error || data.message || '生成失败');
         }
         
         // Display results
-        generatedStickers = stickers;
-        displayStickers(stickers);
+        generatedStickers = data.stickers;
+        displayStickers(data.stickers);
         
-        const successCount = stickers.filter(s => s.success).length;
-        showNotification(`成功生成 ${successCount}/${stickers.length} 个表情包！`, 'success');
+        const successCount = data.stickers.filter(s => s.success).length;
+        showNotification(`成功生成 ${successCount}/${data.stickers.length} 个表情包！`, 'success');
         
         if (successCount > 0) {
             downloadAllBtn.disabled = false;
