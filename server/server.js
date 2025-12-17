@@ -2,6 +2,7 @@ const express = require('express');
 const cors = require('cors');
 const fetch = require('node-fetch');
 const path = require('path');
+const FormData = require('form-data');
 require('dotenv').config({ path: path.join(__dirname, '.env') });
 
 const app = express();
@@ -84,10 +85,10 @@ async function callApiWithRetry(url, options, maxRetries = 2) {
     throw lastError;
 }
 
-// ===== WhatAI 图片生成代理 =====
+// ===== WhatAI 图片生成代理 (使用 /v1/images/edits 端点) =====
 app.post('/api/generate/image', async (req, res) => {
     try {
-        const { prompt, count = 1 } = req.body;
+        const { prompt, count = 1, image } = req.body;
 
         if (!WHATAI_API_KEY) {
             return res.status(500).json({ 
@@ -106,7 +107,8 @@ app.post('/api/generate/image', async (req, res) => {
         
         for (let i = 0; i < count; i++) {
             try {
-                const data = await callApiWithRetry(`${WHATAI_API_URL}/v1/chat/completions`, {
+                // 使用 /v1/images/edits 端点
+                const data = await callApiWithRetry(`${WHATAI_API_URL}/v1/images/edits`, {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
@@ -114,23 +116,24 @@ app.post('/api/generate/image', async (req, res) => {
                     },
                     body: JSON.stringify({
                         model: WHATAI_MODEL,
-                        messages: [
-                            {
-                                role: 'user',
-                                content: `Generate an image: ${prompt}`
-                            }
-                        ]
+                        prompt: prompt,
+                        n: 1,
+                        size: '1024x1024',
+                        response_format: 'b64_json'
                     })
                 });
 
                 // 解析返回的图片
-                const imageUrl = extractImageFromResponse(data);
-                if (imageUrl) {
-                    images.push({
-                        url: imageUrl,
-                        prompt: prompt,
-                        model: WHATAI_MODEL
-                    });
+                if (data.data && data.data[0]) {
+                    const imgData = data.data[0];
+                    const imageUrl = imgData.url || (imgData.b64_json ? `data:image/png;base64,${imgData.b64_json}` : null);
+                    if (imageUrl) {
+                        images.push({
+                            url: imageUrl,
+                            prompt: imgData.revised_prompt || prompt,
+                            model: WHATAI_MODEL
+                        });
+                    }
                 }
             } catch (err) {
                 console.error(`[WhatAI] 生成第 ${i + 1} 张图片失败:`, err.message);
@@ -197,30 +200,30 @@ app.post('/api/generate/sticker', async (req, res) => {
                 
                 prompt += `The expression/emotion should match the text "${expr}". High quality, cute, expressive.`;
 
-                const requestBody = {
-                    model: WHATAI_MODEL,
-                    messages: [
-                        {
-                            role: 'user',
-                            content: referenceImage ? [
-                                { type: 'text', text: prompt },
-                                { type: 'image_url', image_url: { url: referenceImage } }
-                            ] : prompt
-                        }
-                    ]
-                };
-
-                // 使用带超时和重试的 API 调用
-                const data = await callApiWithRetry(`${WHATAI_API_URL}/v1/chat/completions`, {
+                // 使用 /v1/images/edits 端点
+                const data = await callApiWithRetry(`${WHATAI_API_URL}/v1/images/edits`, {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
                         'Authorization': `Bearer ${WHATAI_API_KEY}`
                     },
-                    body: JSON.stringify(requestBody)
+                    body: JSON.stringify({
+                        model: WHATAI_MODEL,
+                        prompt: prompt,
+                        image: referenceImage || undefined,
+                        n: 1,
+                        size: '1024x1024',
+                        response_format: 'b64_json'
+                    })
                 });
 
-                const imageUrl = extractImageFromResponse(data);
+                // 解析返回的图片
+                let imageUrl = null;
+                if (data.data && data.data[0]) {
+                    const imgData = data.data[0];
+                    imageUrl = imgData.url || (imgData.b64_json ? `data:image/png;base64,${imgData.b64_json}` : null);
+                }
+                
                 stickers.push({
                     expression: expr,
                     url: imageUrl,
