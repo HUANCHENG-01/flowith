@@ -1,26 +1,14 @@
 // ===== ArtFlow - AI Image Generation Platform =====
 
-// API Configuration
-// 自动检测 API 地址：本地开发用 localhost:3000，部署后用当前域名
-const getApiBaseUrl = () => {
-    if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
-        return 'http://localhost:3000';
-    }
-    return window.location.origin;
-};
-
+// API Configuration - 使用 whatai.cc API
 const API_CONFIG = {
-    baseUrl: getApiBaseUrl(),
-    endpoints: {
-        openai: '/api/generate/openai',
-        gemini: '/api/generate/gemini',
-        geminiFlash: '/api/generate/gemini-flash',
-        health: '/api/health'
-    }
+    baseUrl: 'https://api.whatai.cc',
+    apiKey: 'sk-sd8MpVSVDdQtQZj77AlhDayAOlQc5u3VmYQIXV2aKilNZhcx',
+    model: 'gemini-3-pro-image-preview'
 };
 
-// Current selected model
-let currentModel = 'openai'; // 'openai', 'gemini', 'gemini-flash'
+// Current selected model - 使用 gemini-3-pro-image-preview
+let currentModel = 'gemini';
 
 // DOM Elements
 const promptInput = document.getElementById('promptInput');
@@ -32,6 +20,89 @@ const galleryGrid = document.getElementById('galleryGrid');
 const imageModal = document.getElementById('imageModal');
 const modalImage = document.getElementById('modalImage');
 const modelSelect = document.getElementById('modelSelect');
+
+// ===== 直接调用 whatai.cc API 生成图片 =====
+async function generateWithWhatAI(prompt, count = 1) {
+    const images = [];
+    
+    for (let i = 0; i < count; i++) {
+        showNotification(`正在生成第 ${i + 1}/${count} 张图片...`, 'info');
+        
+        const response = await fetch(`${API_CONFIG.baseUrl}/v1/chat/completions`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${API_CONFIG.apiKey}`
+            },
+            body: JSON.stringify({
+                model: API_CONFIG.model,
+                messages: [
+                    {
+                        role: 'user',
+                        content: `Generate an image: ${prompt}`
+                    }
+                ]
+            })
+        });
+        
+        const data = await response.json();
+        
+        if (!response.ok) {
+            throw new Error(data.error?.message || '生成失败');
+        }
+        
+        // 解析返回的图片
+        if (data.choices && data.choices[0]?.message?.content) {
+            const content = data.choices[0].message.content;
+            // 检查是否有图片数据 (base64 或 URL)
+            if (typeof content === 'string' && content.includes('data:image')) {
+                images.push({
+                    url: content,
+                    prompt: prompt,
+                    model: API_CONFIG.model,
+                    timestamp: new Date().toISOString()
+                });
+            } else if (data.choices[0].message.image_url) {
+                images.push({
+                    url: data.choices[0].message.image_url,
+                    prompt: prompt,
+                    model: API_CONFIG.model,
+                    timestamp: new Date().toISOString()
+                });
+            } else {
+                // 尝试从内容中提取图片
+                const imgMatch = content.match(/!\[.*?\]\((.*?)\)/);
+                if (imgMatch) {
+                    images.push({
+                        url: imgMatch[1],
+                        prompt: prompt,
+                        model: API_CONFIG.model,
+                        timestamp: new Date().toISOString()
+                    });
+                }
+            }
+        }
+        
+        // 检查是否有 inline_data 格式
+        if (data.choices?.[0]?.message?.parts) {
+            for (const part of data.choices[0].message.parts) {
+                if (part.inline_data?.data) {
+                    const mimeType = part.inline_data.mime_type || 'image/png';
+                    images.push({
+                        url: `data:${mimeType};base64,${part.inline_data.data}`,
+                        prompt: prompt,
+                        model: API_CONFIG.model,
+                        timestamp: new Date().toISOString()
+                    });
+                }
+            }
+        }
+    }
+    
+    generatedImages = [...images, ...generatedImages];
+    displayGeneratedImages();
+    return images;
+}
 
 // Sample Images (using placeholder images for demo)
 const sampleImages = [
@@ -156,45 +227,9 @@ function getModelDisplayName(model) {
 
 // ===== Check API Status =====
 async function checkApiStatus() {
-    try {
-        const response = await fetch(`${API_CONFIG.baseUrl}${API_CONFIG.endpoints.health}`);
-        const data = await response.json();
-        
-        console.log('API 状态:', data);
-        
-        // 更新模型选择器状态
-        if (modelSelect) {
-            const openaiOption = modelSelect.querySelector('option[value="openai"]');
-            const geminiOption = modelSelect.querySelector('option[value="gemini"]');
-            const geminiFlashOption = modelSelect.querySelector('option[value="gemini-flash"]');
-            
-            if (openaiOption && !data.openai) {
-                openaiOption.textContent += ' (未配置)';
-                openaiOption.disabled = true;
-            }
-            if (geminiOption && !data.gemini) {
-                geminiOption.textContent += ' (未配置)';
-                geminiOption.disabled = true;
-            }
-            if (geminiFlashOption && !data.gemini) {
-                geminiFlashOption.textContent += ' (未配置)';
-                geminiFlashOption.disabled = true;
-            }
-            
-            // 如果当前选中的模型未配置，切换到演示模式
-            if ((currentModel === 'openai' && !data.openai) ||
-                (currentModel.startsWith('gemini') && !data.gemini)) {
-                currentModel = 'demo';
-                modelSelect.value = 'demo';
-            }
-        }
-    } catch (error) {
-        console.warn('API 服务器未运行，使用演示模式');
-        currentModel = 'demo';
-        if (modelSelect) {
-            modelSelect.value = 'demo';
-        }
-    }
+    // whatai.cc API 已配置，直接可用
+    console.log('使用 whatai.cc API，模型:', API_CONFIG.model);
+    showNotification('API 已就绪，可以开始生成图片', 'success');
 }
 
 // ===== Scroll to Generator =====
@@ -217,9 +252,10 @@ async function generateImages() {
     }
     
     const count = parseInt(document.getElementById('countSelect').value);
-    const size = document.getElementById('sizeSelect').value;
     const style = document.getElementById('styleSelect').value;
-    const quality = document.getElementById('qualitySelect').value;
+    
+    // 组合提示词
+    const fullPrompt = style !== 'default' ? `${prompt}，${style}风格` : prompt;
     
     // Show loading state
     generateBtn.classList.add('loading');
@@ -229,24 +265,12 @@ async function generateImages() {
     showSkeletonLoaders(count);
     
     try {
-        let images = [];
-        
-        if (currentModel === 'demo') {
-            // 演示模式 - 使用占位图
-            images = await simulateGeneration(count, prompt);
-        } else if (currentModel === 'openai') {
-            // OpenAI DALL-E 3
-            images = await generateWithOpenAI(prompt, size, quality, count);
-        } else if (currentModel === 'gemini') {
-            // Google Imagen 3
-            images = await generateWithGemini(prompt, size, count);
-        } else if (currentModel === 'gemini-flash') {
-            // Gemini 2.0 Flash
-            images = await generateWithGeminiFlash(prompt, count);
-        }
+        const images = await generateWithWhatAI(fullPrompt, count);
         
         if (images.length > 0) {
             showNotification(`成功生成 ${images.length} 张图片！`, 'success');
+        } else {
+            showNotification('未能生成图片，请重试', 'warning');
         }
     } catch (error) {
         showNotification(error.message || '生成失败，请重试', 'error');
