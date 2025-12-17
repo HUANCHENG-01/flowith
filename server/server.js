@@ -21,6 +21,69 @@ const WHATAI_API_URL = process.env.WHATAI_API_URL || 'https://api.whatai.cc';
 const WHATAI_API_KEY = process.env.WHATAI_API_KEY;
 const WHATAI_MODEL = process.env.WHATAI_MODEL || 'gemini-3-pro-image-preview';
 
+// 请求超时时间 (2分钟，图片生成需要较长时间)
+const API_TIMEOUT = 120000;
+
+// 带超时的 fetch 函数
+async function fetchWithTimeout(url, options, timeout = API_TIMEOUT) {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), timeout);
+    
+    try {
+        const response = await fetch(url, {
+            ...options,
+            signal: controller.signal
+        });
+        clearTimeout(timeoutId);
+        return response;
+    } catch (error) {
+        clearTimeout(timeoutId);
+        if (error.name === 'AbortError') {
+            throw new Error('请求超时，请重试');
+        }
+        throw error;
+    }
+}
+
+// 带重试的 API 调用
+async function callApiWithRetry(url, options, maxRetries = 2) {
+    let lastError;
+    
+    for (let i = 0; i <= maxRetries; i++) {
+        try {
+            const response = await fetchWithTimeout(url, options);
+            
+            // 获取响应文本
+            const text = await response.text();
+            
+            // 尝试解析 JSON
+            let data;
+            try {
+                data = JSON.parse(text);
+            } catch (parseError) {
+                console.error(`[API] JSON 解析失败，响应内容: ${text.substring(0, 500)}`);
+                throw new Error('API 返回无效响应');
+            }
+            
+            if (!response.ok) {
+                throw new Error(data.error?.message || `API 错误: ${response.status}`);
+            }
+            
+            return data;
+        } catch (error) {
+            lastError = error;
+            console.error(`[API] 第 ${i + 1} 次尝试失败:`, error.message);
+            
+            if (i < maxRetries) {
+                // 等待后重试
+                await new Promise(resolve => setTimeout(resolve, 2000));
+            }
+        }
+    }
+    
+    throw lastError;
+}
+
 // ===== WhatAI 图片生成代理 =====
 app.post('/api/generate/image', async (req, res) => {
     try {
@@ -42,38 +105,35 @@ app.post('/api/generate/image', async (req, res) => {
         const images = [];
         
         for (let i = 0; i < count; i++) {
-            const response = await fetch(`${WHATAI_API_URL}/v1/chat/completions`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${WHATAI_API_KEY}`
-                },
-                body: JSON.stringify({
-                    model: WHATAI_MODEL,
-                    messages: [
-                        {
-                            role: 'user',
-                            content: `Generate an image: ${prompt}`
-                        }
-                    ]
-                })
-            });
-
-            const data = await response.json();
-
-            if (!response.ok) {
-                console.error('[WhatAI] API 错误:', data.error);
-                throw new Error(data.error?.message || '生成失败');
-            }
-
-            // 解析返回的图片
-            const imageUrl = extractImageFromResponse(data);
-            if (imageUrl) {
-                images.push({
-                    url: imageUrl,
-                    prompt: prompt,
-                    model: WHATAI_MODEL
+            try {
+                const data = await callApiWithRetry(`${WHATAI_API_URL}/v1/chat/completions`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${WHATAI_API_KEY}`
+                    },
+                    body: JSON.stringify({
+                        model: WHATAI_MODEL,
+                        messages: [
+                            {
+                                role: 'user',
+                                content: `Generate an image: ${prompt}`
+                            }
+                        ]
+                    })
                 });
+
+                // 解析返回的图片
+                const imageUrl = extractImageFromResponse(data);
+                if (imageUrl) {
+                    images.push({
+                        url: imageUrl,
+                        prompt: prompt,
+                        model: WHATAI_MODEL
+                    });
+                }
+            } catch (err) {
+                console.error(`[WhatAI] 生成第 ${i + 1} 张图片失败:`, err.message);
             }
         }
 
@@ -150,7 +210,8 @@ app.post('/api/generate/sticker', async (req, res) => {
                     ]
                 };
 
-                const response = await fetch(`${WHATAI_API_URL}/v1/chat/completions`, {
+                // 使用带超时和重试的 API 调用
+                const data = await callApiWithRetry(`${WHATAI_API_URL}/v1/chat/completions`, {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
@@ -158,12 +219,6 @@ app.post('/api/generate/sticker', async (req, res) => {
                     },
                     body: JSON.stringify(requestBody)
                 });
-
-                const data = await response.json();
-
-                if (!response.ok) {
-                    throw new Error(data.error?.message || '生成失败');
-                }
 
                 const imageUrl = extractImageFromResponse(data);
                 stickers.push({
@@ -210,7 +265,7 @@ app.post('/api/generate/expressions', async (req, res) => {
             return res.status(500).json({ error: '未配置 API 密钥' });
         }
 
-        const response = await fetch(`${WHATAI_API_URL}/v1/chat/completions`, {
+        const data = await callApiWithRetry(`${WHATAI_API_URL}/v1/chat/completions`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
@@ -226,13 +281,7 @@ app.post('/api/generate/expressions', async (req, res) => {
                 ],
                 max_tokens: 300
             })
-        });
-
-        const data = await response.json();
-
-        if (!response.ok) {
-            throw new Error(data.error?.message || '生成失败');
-        }
+        }, 1); // 只重试1次，文本生成较快
 
         const content = data.choices?.[0]?.message?.content || '';
         const expressions = content
